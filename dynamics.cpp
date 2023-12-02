@@ -202,11 +202,21 @@ void handle_input(Drone *drone) {
 
 */
 
-
 #include <ncurses.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
+#include <semaphore.h>
+#include <string.h>
 #include <time.h>
+#include <math.h>
+#define SHMOBJ_PATH "/shm_AOS"
+#define SEM_PATH_1 "/sem_AOS_1"
+#define SEM_PATH_2 "/sem_AOS_2"
 
 #define WIDTH 80
 #define HEIGHT 24
@@ -244,6 +254,8 @@ void generate_obstacle(Obstacle *obstacle);
 void check_collision(Drone *drone, Target *target, Obstacle *obstacle);
 void handle_input(Drone *drone);
 
+double *position_array;
+
 int main() {
     srand(time(NULL));
 
@@ -256,21 +268,48 @@ int main() {
     generate_target(&target);
     generate_obstacle(&obstacle);
 
+    int shared_seg_size = 2 * sizeof(double);
+    
+    // Open shared memory
+    int shmfd = shm_open(SHMOBJ_PATH, O_RDWR, 0666);
+    position_array = (double*)mmap(NULL, shared_seg_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmfd, 0);
+
+    // Open semaphores
+    sem_t *sem_id1 = sem_open(SEM_PATH_1, 0);
+    sem_t *sem_id2 = sem_open(SEM_PATH_2, 0);
+
     while (1) {
+
         draw_window();
         draw_drone(&drone);
         draw_target(&target);
         draw_obstacle(&obstacle);
 
         move_drone(&drone);
+
+        sem_wait(sem_id1); //wait reader
+
+        position_array[0] = drone.x;
+        position_array[1] = drone.y;
+        //sleep(1);
+
+        sem_post(sem_id2); //start the read
+
         check_collision(&drone, &target, &obstacle);
         handle_input(&drone);
-
+        
         refresh();
         usleep(10000); // sleep for 10ms (smoother movement)
     }
 
     endwin();
+
+    /* Clean all and exit */
+    sem_close(sem_id1);
+    sem_close(sem_id2);
+    sem_unlink(SEM_PATH_1);
+    sem_unlink(SEM_PATH_2);
+
     return 0;
 }
 
