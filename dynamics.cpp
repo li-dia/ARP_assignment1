@@ -288,11 +288,9 @@ int main() {
         move_drone(&drone);
 
         sem_wait(sem_id1); //wait reader
-
         position_array[0] = drone.x;
         position_array[1] = drone.y;
         //sleep(1);
-
         sem_post(sem_id2); //start the read
 
         check_collision(&drone, &target, &obstacle);
