@@ -202,80 +202,30 @@ void handle_input(Drone *drone) {
 
 */
 
-#include <ncurses.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <semaphore.h>
-#include <string.h>
-#include <time.h>
-#include <math.h>
-#define SHMOBJ_PATH "/shm_POS"
-#define SEM_PATH_1 "/sem_POS_1"
-#define SEM_PATH_2 "/sem_POS_2"
+#include "./../headerFiles/dynamics.h"
 
-#define WIDTH 80
-#define HEIGHT 24
-#define DRONE_CHAR '+'
-#define TARGET_CHAR 'O'
-#define OBSTACLE_CHAR '*'
+// typedef struct {
+//     int x;
+//     int y;
+//     int active;
+// } Target;
 
-typedef struct {
-    int x;
-    int y;
-    double force_x;
-    double force_y;
-} Drone;
-
-typedef struct {
-    int x;
-    int y;
-    int active;
-} Target;
-
-typedef struct {
-    int x;
-    int y;
-    int active;
-} Obstacle;
+// typedef struct {
+//     int x;
+//     int y;
+//     int active;
+// } Obstacle;
 
 void init_ncurses();
 void draw_window();
 void draw_drone(Drone *drone);
-void draw_target(Target *target);
-void draw_obstacle(Obstacle *obstacle);
+// void draw_target(Target *target);
+// void draw_obstacle(Obstacle *obstacle);
 void move_drone(Drone *drone);
-void generate_target(Target *target);
-void generate_obstacle(Obstacle *obstacle);
-void check_collision(Drone *drone, Target *target, Obstacle *obstacle);
+// void generate_target(Target *target);
+// void generate_obstacle(Obstacle *obstacle);
+// void check_collision(Drone *drone, Target *target, Obstacle *obstacle);
 void handle_input(Drone *drone);
-
-
-
-void handler_dyn(int sig, siginfo_t *info, void *context) {
-    time_t now;
-    time(&now);
-    char time_str[30];
-    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", localtime(&now));
-
-    printf("Signal %d received at %s\n", sig, time_str);
-
-    // Log the information to the file
-    FILE *log_file = fopen("logs/signal_log.txt", "a");
-    if (log_file != NULL) {
-        fprintf(log_file, "Signal %d received at %s\n", sig, time_str);
-        fclose(log_file);
-    } else {
-        perror("Error opening log file");
-    }
-}
-
-
-double *position_array;
 
 int main() {
     srand(time(NULL));
@@ -285,11 +235,11 @@ int main() {
     
 
     Drone drone = {WIDTH / 2, HEIGHT / 2, 0, 0};
-    Target target = {0, 0, 0};
-    Obstacle obstacle = {0, 0, 0};
+    // Target target = {0, 0, 0};
+    // Obstacle obstacle = {0, 0, 0};
 
-    generate_target(&target);
-    generate_obstacle(&obstacle);
+    // generate_target(&target);
+    // generate_obstacle(&obstacle);
 
     int shared_seg_size = 2 * sizeof(double);
     
@@ -305,8 +255,8 @@ int main() {
 
         draw_window();
         draw_drone(&drone);
-        draw_target(&target);
-        draw_obstacle(&obstacle);
+        // draw_target(&target);
+        // draw_obstacle(&obstacle);
 
         move_drone(&drone);
 
@@ -316,7 +266,7 @@ int main() {
         //sleep(1);
         sem_post(sem_id2); //start the read
 
-        check_collision(&drone, &target, &obstacle);
+        // check_collision(&drone, &target, &obstacle);
         handle_input(&drone);
         
         refresh();
@@ -334,138 +284,44 @@ int main() {
     return 0;
 }
 
-void init_ncurses() {
-    initscr();
-    start_color();
-    init_pair(1, COLOR_BLUE, COLOR_WHITE);    // Drone color (Blue on White)
-    init_pair(2, COLOR_GREEN, COLOR_WHITE);   // Target color (Green on White)
-    init_pair(3, COLOR_YELLOW, COLOR_WHITE);  // Obstacle color (Yellow on White)
 
-    // Set background color to white
-    if (has_colors()) {
-        start_color();
-        init_pair(4, COLOR_WHITE, COLOR_WHITE);
-        bkgd(COLOR_PAIR(4));
-    }
+// void draw_target(Target *target) {
+//     if (target->active) {
+//         attron(COLOR_PAIR(2));
+//         mvprintw(target->y, target->x, "%c", TARGET_CHAR);
+//         attroff(COLOR_PAIR(2));
+//     }
+// }
 
-    raw();
-    keypad(stdscr, TRUE);
-    noecho();
-    curs_set(0);
-    timeout(0);
-}
+// void draw_obstacle(Obstacle *obstacle) {
+//     if (obstacle->active) {
+//         attron(COLOR_PAIR(3));
+//         mvprintw(obstacle->y, obstacle->x, "%c", OBSTACLE_CHAR);
+//         attroff(COLOR_PAIR(3));
+//     }
+// }
 
-void draw_window() {
-    clear();
-    border(0, 0, 0, 0, 0, 0, 0, 0);
-}
+// void generate_target(Target *target) {
+//     target->x = rand() % (WIDTH - 2) + 1;
+//     target->y = rand() % (HEIGHT - 2) + 1;
+//     target->active = 1;
+// }
 
-void draw_drone(Drone *drone) {
-    attron(COLOR_PAIR(1));
-    mvprintw(drone->y, drone->x, "%c", DRONE_CHAR);
-    mvprintw(drone->y - 1, drone->x, " ");
-    mvprintw(drone->y + 1, drone->x, " ");
-    mvprintw(drone->y, drone->x - 1, " ");
-    mvprintw(drone->y, drone->x + 1, " ");
-    attroff(COLOR_PAIR(1));
-}
+// void generate_obstacle(Obstacle *obstacle) {
+//     obstacle->x = rand() % (WIDTH - 2) + 1;
+//     obstacle->y = rand() % (HEIGHT - 2) + 1;
+//     obstacle->active = 1;
+// }
 
-void draw_target(Target *target) {
-    if (target->active) {
-        attron(COLOR_PAIR(2));
-        mvprintw(target->y, target->x, "%c", TARGET_CHAR);
-        attroff(COLOR_PAIR(2));
-    }
-}
+// void check_collision(Drone *drone, Target *target, Obstacle *obstacle) {
+//     if (drone->x == target->x && drone->y == target->y) {
+//         target->active = 0;
+//         generate_target(target);
+//     }
 
-void draw_obstacle(Obstacle *obstacle) {
-    if (obstacle->active) {
-        attron(COLOR_PAIR(3));
-        mvprintw(obstacle->y, obstacle->x, "%c", OBSTACLE_CHAR);
-        attroff(COLOR_PAIR(3));
-    }
-}
-
-void move_drone(Drone *drone) {
-    // Add damping factor for smoother movement
-    double damping = 0.50;
-
-    drone->x += (int)drone->force_x;
-    drone->y += (int)drone->force_y;
-
-    if (drone->x < 1) drone->x = 1;
-    if (drone->x >= WIDTH - 1) drone->x = WIDTH - 2;
-    if (drone->y < 1) drone->y = 1;
-    if (drone->y >= HEIGHT - 1) drone->y = HEIGHT - 2;
-
-    // Apply damping
-    drone->force_x *= damping;
-    drone->force_y *= damping;
-}
-
-void generate_target(Target *target) {
-    target->x = rand() % (WIDTH - 2) + 1;
-    target->y = rand() % (HEIGHT - 2) + 1;
-    target->active = 1;
-}
-
-void generate_obstacle(Obstacle *obstacle) {
-    obstacle->x = rand() % (WIDTH - 2) + 1;
-    obstacle->y = rand() % (HEIGHT - 2) + 1;
-    obstacle->active = 1;
-}
-
-void check_collision(Drone *drone, Target *target, Obstacle *obstacle) {
-    if (drone->x == target->x && drone->y == target->y) {
-        target->active = 0;
-        generate_target(target);
-    }
-
-    if (drone->x == obstacle->x && drone->y == obstacle->y) {
-        obstacle->active = 0;
-        generate_obstacle(obstacle);
-    }
-}
-
-void handle_input(Drone *drone) {
-    int ch = getch();
-
-    switch (ch) {
-        case 'q':
-            endwin();
-            exit(0);
-        case KEY_UP:
-            drone->force_y -= 1.0;
-            break;
-        case KEY_DOWN:
-            drone->force_y += 1.0;
-            break;
-        case KEY_LEFT:
-            drone->force_x -= 1.0;
-            break;
-        case KEY_RIGHT:
-            drone->force_x += 1.0;
-            break;
-        case 'Q':
-            drone->force_x -= 1.0;
-            drone->force_y -= 1.0;
-            break;
-        case 'E':
-            drone->force_x += 1.0;
-            drone->force_y -= 1.0;
-            break;
-        case 'Z':
-            drone->force_x -= 1.0;
-            drone->force_y += 1.0;
-            break;
-        case 'C':
-            drone->force_x += 1.0;
-            drone->force_y += 1.0;
-            break;
-        case 'r':
-            drone->x = WIDTH / 2;
-            drone->y = HEIGHT / 2;
-            break;
-    }
-}
+//     if (drone->x == obstacle->x && drone->y == obstacle->y) {
+//         obstacle->active = 0;
+//         generate_obstacle(obstacle);
+//     }
+// }
 
