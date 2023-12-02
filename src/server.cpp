@@ -9,7 +9,6 @@
 #include <semaphore.h>
 #include <string.h>
 #include <signal.h>
-#include <asm-generic/siginfo.h>
 #include <time.h>
 
 

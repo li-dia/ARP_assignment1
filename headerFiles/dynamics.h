@@ -10,7 +10,6 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
-#include <asm-generic/siginfo.h>
 #include <signal.h>
 
 
@@ -58,6 +57,9 @@ void handler_dyn(int sig, siginfo_t *info, void *context) {
         perror("Error opening log file");
     }
 }
+
+#ifndef DYNAMICS_H
+#define DYNAMICS_H
 
 void init_ncurses() {
     initscr();
@@ -153,3 +155,5 @@ void move_drone(Drone *drone) {
     drone->force_x *= damping;
     drone->force_y *= damping;
 }
+
+#endif // DYNAMICS_H

@@ -10,7 +10,6 @@
 #include <stdbool.h>
 #include <semaphore.h>
 #include <string.h>
-#include <asm-generic/siginfo.h>
 
 #define SHM_pids "/my_shared_memory_pids"
 #define SEM_PATH_1 "/sem_PID_1"
@@ -28,15 +27,10 @@ int main() {
         return -1;
     }
 
-    // Create or open semaphores
-    sem_t *sem_id1 = sem_open(SEM_PATH_1, O_CREAT, S_IRUSR | S_IWUSR, 0);
-    sem_t *sem_id2 = sem_open(SEM_PATH_2, O_CREAT, S_IRUSR | S_IWUSR, 0);
-
-    // Initialize semaphores
-    sem_init(sem_id1, 1, 1); // initialized to 1
-    sem_init(sem_id2, 1, 0); // initialized to 0
-
-
+    // Open semaphores
+    sem_t *sem_id1 = sem_open(SEM_PATH_1, 0);
+    sem_t *sem_id2 = sem_open(SEM_PATH_2, 0);
+    
     /* Wait for Master to write */
     sem_wait(sem_id2);
     printf("data read \n");

@@ -1,16 +1,16 @@
-gcc src/dynamics.cpp -lncurses -lm -lrt -lpthread -o bin/dynamics 
+g++ src/dynamics.cpp -lncurses -lm -lrt -lpthread -o bin/dynamics 
 echo "Compiling dynamics";
 
-# gcc src/keyboardMan.c -lncurses -lm -lrt -lpthread -o bin/keyboardMan 
+# g++ src/keyboardMan.c -lncurses -lm -lrt -lpthread -o bin/keyboardMan 
 # echo "Compiling keyboardMan";
 
-gcc src/server.cpp -lncurses -lm -lrt -lpthread -o bin/server 
+g++ src/server.cpp -lncurses -lm -lrt -lpthread -o bin/server 
 echo "Compiling server";
 
-gcc src/master.cpp -lncurses -lm -lrt -lpthread -o bin/master 
+g++ src/master.cpp -lncurses -lm -lrt -lpthread -o bin/master 
 echo "Compiling master";
 
-gcc src/watchdog.cpp -lncurses -lm -lrt -lpthread -o bin/watchdog 
+g++ src/watchdog.cpp -lncurses -lm -lrt -lpthread -o bin/watchdog 
 echo "Compiling watchdog";  
 
 ./bin/master

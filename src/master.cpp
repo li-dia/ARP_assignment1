@@ -53,9 +53,15 @@ int main() {
     }
 
     int status;
-    // Open semaphores
-    sem_t *sem_id1 = sem_open(SEM_PATH_1, 0);
-    sem_t *sem_id2 = sem_open(SEM_PATH_2, 0);
+
+    // Create or open semaphores
+    sem_t *sem_id1 = sem_open(SEM_PATH_1, O_CREAT, S_IRUSR | S_IWUSR, 0);
+    sem_t *sem_id2 = sem_open(SEM_PATH_2, O_CREAT, S_IRUSR | S_IWUSR, 0);
+
+    // Initialize semaphores
+    sem_init(sem_id1, 1, 1); // initialized to 1
+    sem_init(sem_id2, 1, 0); // initialized to 0
+
     sem_wait(sem_id1); //wait reader
     // Specify the path to the programs you want to run.
     char *program_path[MAX_PIDS] = {"./bin/dynamics", "./bin/server", "./...."};
