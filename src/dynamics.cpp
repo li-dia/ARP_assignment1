@@ -251,6 +251,12 @@ int main() {
     sem_t *sem_id1 = sem_open(SEM_PATH_1, 0);
     sem_t *sem_id2 = sem_open(SEM_PATH_2, 0);
 
+    // Set up signal handling
+    struct sigaction sa;
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = handler_dyn;
+    sigaction(SIGUSR1, &sa, NULL);
+
     while (1) {
 
         draw_window();

@@ -46,7 +46,7 @@ int main() {
     }
 
     // Map the shared memory segment into the address space
-    pid_t *pid_array = mmap(NULL, sizeof(pid_t) * MAX_PIDS, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    pid_t *pid_array = (pid_t*)mmap(NULL, sizeof(pid_t) * MAX_PIDS, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
     if (pid_array == MAP_FAILED) {
         perror("mmap failed");
         exit(EXIT_FAILURE);

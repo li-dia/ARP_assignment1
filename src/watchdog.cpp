@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <semaphore.h>
 #include <string.h>
+#include <asm-generic/siginfo.h>
 
 #define SHM_pids "/my_shared_memory_pids"
 #define SEM_PATH_1 "/sem_PID_1"
@@ -41,7 +42,7 @@ int main() {
     printf("data read \n");
 
     // Map the shared memory segment into the address space for PIDs
-    pid_array = mmap(NULL, MAX_PIDS * sizeof(pid_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd_pids, 0);
+    pid_array = (pid_t*)mmap(NULL, MAX_PIDS * sizeof(pid_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd_pids, 0);
     if (pid_array == MAP_FAILED) {
         perror("mmap failed");
         exit(EXIT_FAILURE);

@@ -4,13 +4,13 @@ echo "Compiling dynamics";
 # gcc src/keyboardMan.c -lncurses -lm -lrt -lpthread -o bin/keyboardMan 
 # echo "Compiling keyboardMan";
 
-gcc src/server.c -lncurses -lm -lrt -lpthread -o bin/server 
+gcc src/server.cpp -lncurses -lm -lrt -lpthread -o bin/server 
 echo "Compiling server";
 
-gcc src/master.c -lncurses -lm -lrt -lpthread -o bin/master 
+gcc src/master.cpp -lncurses -lm -lrt -lpthread -o bin/master 
 echo "Compiling master";
 
-gcc src/watchdog.c -lncurses -lm -lrt -lpthread -o bin/watchdog 
+gcc src/watchdog.cpp -lncurses -lm -lrt -lpthread -o bin/watchdog 
 echo "Compiling watchdog";  
 
 ./bin/master

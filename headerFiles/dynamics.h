@@ -11,6 +11,7 @@
 #include <time.h>
 #include <math.h>
 #include <asm-generic/siginfo.h>
+#include <signal.h>
 
 
 /*            Paths            */
@@ -49,7 +50,7 @@ void handler_dyn(int sig, siginfo_t *info, void *context) {
     printf("Signal %d received at %s\n", sig, time_str);
 
     // Log the information to the file
-    FILE *log_file = fopen("logs/signal_log.txt", "a");
+    FILE *log_file = fopen("logs/dynamics_log.txt", "a");
     if (log_file != NULL) {
         fprintf(log_file, "Signal %d received at %s\n", sig, time_str);
         fclose(log_file);

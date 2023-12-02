@@ -9,6 +9,9 @@
 #include <semaphore.h>
 #include <string.h>
 #include <signal.h>
+#include <asm-generic/siginfo.h>
+#include <time.h>
+
 
 #define SHMOBJ_PATH "/shm_POS"
 #define SEM_PATH_1 "/sem_POS_1"
@@ -25,7 +28,7 @@ void handler_srv(int sig, siginfo_t *info, void *context) {
     printf("Signal %d received at %s\n", sig, time_str);
 
     // Log the information to the file
-    FILE *log_file = fopen("logs/signal_log.txt", "a");
+    FILE *log_file = fopen("logs/server_log.txt", "a");
     if (log_file != NULL) {
         fprintf(log_file, "Signal %d received at %s\n", sig, time_str);
         fclose(log_file);
@@ -42,7 +45,7 @@ int main() {
     // Create or open shared memory
     int shmfd = shm_open(SHMOBJ_PATH, O_CREAT | O_RDWR, 0666);
     ftruncate(shmfd, shared_seg_size);
-    position_array = mmap(NULL, shared_seg_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmfd, 0);
+    position_array = (double*)mmap(NULL, shared_seg_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmfd, 0);
 
     // Create or open semaphores
     sem_t *sem_id1 = sem_open(SEM_PATH_1, O_CREAT, S_IRUSR | S_IWUSR, 0);
