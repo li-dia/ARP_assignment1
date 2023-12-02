@@ -6,8 +6,11 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
+#include <semaphore.h>
 
 #define SHM_NAME "/my_shared_memory_pids"
+#define SEM_PATH_1 "/sem_PID_1"
+#define SEM_PATH_2 "/sem_PID_2"
 #define SHM_SIZE 1024  // Adjust the size as needed
 #define MAX_PIDS 3
 
@@ -50,7 +53,10 @@ int main() {
     }
 
     int status;
-
+    // Open semaphores
+    sem_t *sem_id1 = sem_open(SEM_PATH_1, 0);
+    sem_t *sem_id2 = sem_open(SEM_PATH_2, 0);
+    sem_wait(sem_id1); //wait reader
     // Specify the path to the programs you want to run.
     char *program_path[MAX_PIDS] = {"./bin/dynamics", "./bin/server", "./...."};
 
@@ -60,7 +66,7 @@ int main() {
         printf("child %d created with pid: %d\n", i, pid_array[i]);
         fflush(stdout);
     }
-
+    sem_post(sem_id2); //start the read
     // Print the PIDs stored in shared memory
     printf("PIDs stored in shared memory: %d, %d, %d\n", (int)pid_array[0], (int)pid_array[1], (int)pid_array[2]);
     
@@ -86,5 +92,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
+    sem_close(sem_id1);
+    sem_close(sem_id2);
     return EXIT_SUCCESS;
 }

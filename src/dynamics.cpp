@@ -214,9 +214,9 @@ void handle_input(Drone *drone) {
 #include <string.h>
 #include <time.h>
 #include <math.h>
-#define SHMOBJ_PATH "/shm_AOS"
-#define SEM_PATH_1 "/sem_AOS_1"
-#define SEM_PATH_2 "/sem_AOS_2"
+#define SHMOBJ_PATH "/shm_POS"
+#define SEM_PATH_1 "/sem_POS_1"
+#define SEM_PATH_2 "/sem_POS_2"
 
 #define WIDTH 80
 #define HEIGHT 24

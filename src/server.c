@@ -8,11 +8,31 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <string.h>
+#include <signal.h>
 
-#define SHMOBJ_PATH "/shm_AOS"
-#define SEM_PATH_1 "/sem_AOS_1"
-#define SEM_PATH_2 "/sem_AOS_2"
+#define SHMOBJ_PATH "/shm_POS"
+#define SEM_PATH_1 "/sem_POS_1"
+#define SEM_PATH_2 "/sem_POS_2"
 #define POS_NUM 2
+
+
+void handler_srv(int sig, siginfo_t *info, void *context) {
+    time_t now;
+    time(&now);
+    char time_str[30];
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", localtime(&now));
+
+    printf("Signal %d received at %s\n", sig, time_str);
+
+    // Log the information to the file
+    FILE *log_file = fopen("logs/signal_log.txt", "a");
+    if (log_file != NULL) {
+        fprintf(log_file, "Signal %d received at %s\n", sig, time_str);
+        fclose(log_file);
+    } else {
+        perror("Error opening log file");
+    }
+}
 
 double *position_array;
 
@@ -31,6 +51,12 @@ int main() {
     // Initialize semaphores
     sem_init(sem_id1, 1, 1); // initialized to 1
     sem_init(sem_id2, 1, 0); // initialized to 0
+
+    // Set up signal handling
+    struct sigaction sa;
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = handler_srv;
+    sigaction(SIGUSR1, &sa, NULL);
 
     FILE *log_file = fopen("logs/position_log.txt", "w");
     if (log_file == NULL) {
