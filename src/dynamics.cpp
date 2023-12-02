@@ -254,12 +254,35 @@ void generate_obstacle(Obstacle *obstacle);
 void check_collision(Drone *drone, Target *target, Obstacle *obstacle);
 void handle_input(Drone *drone);
 
+
+
+void handler_dyn(int sig, siginfo_t *info, void *context) {
+    time_t now;
+    time(&now);
+    char time_str[30];
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", localtime(&now));
+
+    printf("Signal %d received at %s\n", sig, time_str);
+
+    // Log the information to the file
+    FILE *log_file = fopen("logs/signal_log.txt", "a");
+    if (log_file != NULL) {
+        fprintf(log_file, "Signal %d received at %s\n", sig, time_str);
+        fclose(log_file);
+    } else {
+        perror("Error opening log file");
+    }
+}
+
+
 double *position_array;
 
 int main() {
     srand(time(NULL));
 
     init_ncurses();
+
+    
 
     Drone drone = {WIDTH / 2, HEIGHT / 2, 0, 0};
     Target target = {0, 0, 0};
