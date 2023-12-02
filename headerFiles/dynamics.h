@@ -10,6 +10,8 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include <asm-generic/siginfo.h>
+
 
 /*            Paths            */
 
@@ -35,6 +37,62 @@ typedef struct {
 } Drone;
 
 /*            Functions              */
+
+double *position_array;
+
+void handler_dyn(int sig, siginfo_t *info, void *context) {
+    time_t now;
+    time(&now);
+    char time_str[30];
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", localtime(&now));
+
+    printf("Signal %d received at %s\n", sig, time_str);
+
+    // Log the information to the file
+    FILE *log_file = fopen("logs/signal_log.txt", "a");
+    if (log_file != NULL) {
+        fprintf(log_file, "Signal %d received at %s\n", sig, time_str);
+        fclose(log_file);
+    } else {
+        perror("Error opening log file");
+    }
+}
+
+void init_ncurses() {
+    initscr();
+    start_color();
+    init_pair(1, COLOR_BLUE, COLOR_WHITE);    // Drone color (Blue on White)
+    init_pair(2, COLOR_GREEN, COLOR_WHITE);   // Target color (Green on White)
+    init_pair(3, COLOR_YELLOW, COLOR_WHITE);  // Obstacle color (Yellow on White)
+
+    // Set background color to white
+    if (has_colors()) {
+        start_color();
+        init_pair(4, COLOR_WHITE, COLOR_WHITE);
+        bkgd(COLOR_PAIR(4));
+    }
+
+    raw();
+    keypad(stdscr, TRUE);
+    noecho();
+    curs_set(0);
+    timeout(0);
+}
+
+void draw_window() {
+    clear();
+    border(0, 0, 0, 0, 0, 0, 0, 0);
+}
+
+void draw_drone(Drone *drone) {
+    attron(COLOR_PAIR(1));
+    mvprintw(drone->y, drone->x, "%c", DRONE_CHAR);
+    mvprintw(drone->y - 1, drone->x, " ");
+    mvprintw(drone->y + 1, drone->x, " ");
+    mvprintw(drone->y, drone->x - 1, " ");
+    mvprintw(drone->y, drone->x + 1, " ");
+    attroff(COLOR_PAIR(1));
+}
 
 void handle_input(Drone *drone) {
     int ch = getch();
