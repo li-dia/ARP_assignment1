@@ -14,4 +14,5 @@ g++ src/watchdog.cpp -lncurses -lm -lrt -lpthread -o bin/watchdog
 echo "Compiling watchdog";  
 
 ./bin/master 
-# ./bin/watchdog 
+#./bin/watchdog
+

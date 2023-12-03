@@ -1,89 +1,143 @@
-
-/*#include <ncurses.h>
+#include <ncurses.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
+#include <semaphore.h>
+#include <string.h>
 #include <time.h>
 #include <math.h>
+#include <signal.h>
 
+/* Paths */
+#define SHMOBJ_PATH "/shm_POS"
+#define SEM_PATH_1 "/sem_POS_1"
+#define SEM_PATH_2 "/sem_POS_2"
 
+/* Constants */
+#define WIDTH 80
+#define HEIGHT 24
 #define DRONE_CHAR '+'
-#define M 1
-#define K 1
-#define T 100
 
-int WIDTH,HEIGHT;
-
-
+/* Structures */
 typedef struct {
-    double x;
-    double y;
-    double x2;
-    double x1;
-    double y1;
-    double y2;
+    int x;
+    int y;
     double force_x;
     double force_y;
 } Drone;
 
-typedef struct {
-    int x;
-    int y;
-    int active;
-} Target;
-
-typedef struct {
-    int x;
-    int y;
-    int active;
-} Obstacle;
-
+/* Functions */
+void handler_dyn(int sig, siginfo_t *info, void *context);
 void init_ncurses();
 void draw_window();
 void draw_drone(Drone *drone);
 void move_drone(Drone *drone);
-void check_collision(Drone *drone, Target *target, Obstacle *obstacle);
 void handle_input(Drone *drone);
+void write_data_to_shm(Drone *drone, sem_t *sem_id1, sem_t *sem_id2);
+
+double *position_array;
 
 int main() {
     srand(time(NULL));
 
     init_ncurses();
 
-    Drone drone = {0, 0, 0, 0, 0, 0, 0, 0};
+    Drone drone = {WIDTH / 2, HEIGHT / 2, 0, 0};
 
+    int shared_seg_size = 2 * sizeof(double);
 
+    // Open shared memory
+    int shmfd = shm_open(SHMOBJ_PATH, O_RDWR, 0666);
+    if (shmfd == -1) {
+        perror("Error opening shared memory");
+        exit(EXIT_FAILURE);
+    }
+    position_array = (double *)mmap(NULL, shared_seg_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmfd, 0);
+    if (position_array == MAP_FAILED) {
+        perror("Error mapping shared memory");
+        exit(EXIT_FAILURE);
+    }
 
+    // Open semaphores
+    sem_t *sem_id1 = sem_open(SEM_PATH_1, 0);
+    if (sem_id1 == SEM_FAILED) {
+        perror("Error opening semaphore 1");
+        exit(EXIT_FAILURE);
+    }
+    sem_t *sem_id2 = sem_open(SEM_PATH_2, 0);
+    if (sem_id2 == SEM_FAILED) {
+        perror("Error opening semaphore 2");
+        exit(EXIT_FAILURE);
+    }
 
+    // Set up signal handling
+    struct sigaction sa;
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = handler_dyn;
+    if (sigaction(SIGUSR1, &sa, NULL) == -1) {
+        perror("Error setting up signal handler");
+        exit(EXIT_FAILURE);
+    }
 
     while (1) {
-
         draw_window();
         draw_drone(&drone);
         move_drone(&drone);
+        write_data_to_shm(&drone, sem_id1, sem_id2);
         handle_input(&drone);
-        // Print debug information in black
-        attron(COLOR_PAIR(5));
-        mvprintw(HEIGHT-3, 0, "Position: x=%.2f, y=%.2f", drone.x, drone.y);
-        mvprintw(HEIGHT-2, 0, "Previous position: x1=%.2f, y1=%.2f", drone.x1, drone.y1);
-        mvprintw(HEIGHT-5, 0, "Previous position: x2=%.2f, y2=%.2f", drone.x2, drone.y2);
-        attroff(COLOR_PAIR(5));
-
         refresh();
-        usleep(1000000); // sleep for 10ms (smoother movement)
+        usleep(10000); // sleep for 10ms (smoother movement)
     }
 
     endwin();
+
+    // Clean all and exit
+    if (munmap(position_array, shared_seg_size) == -1) {
+        perror("Error unmapping shared memory");
+        exit(EXIT_FAILURE);
+    }
+    if (close(shmfd) == -1) {
+        perror("Error closing shared memory descriptor");
+        exit(EXIT_FAILURE);
+    }
+
+    if (sem_close(sem_id1) == -1) {
+        perror("Error closing semaphore 1");
+        exit(EXIT_FAILURE);
+    }
+    if (sem_close(sem_id2) == -1) {
+        perror("Error closing semaphore 2");
+        exit(EXIT_FAILURE);
+    }
+
     return 0;
 }
 
-void init_ncurses() {
+void handler_dyn(int sig, siginfo_t *info, void *context) {
+    time_t now;
+    time(&now);
+    char time_str[30];
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", localtime(&now));
 
+    FILE *log_file = fopen("logs/dynamics_log.txt", "a");
+    if (log_file != NULL) {
+        fprintf(log_file, "Signal %d received at %s\n", sig, time_str);
+        fclose(log_file);
+    } else {
+        perror("Error opening log file in signal handler");
+    }
+}
+
+void init_ncurses() {
     initscr();
     start_color();
     init_pair(1, COLOR_BLUE, COLOR_WHITE);    // Drone color (Blue on White)
     init_pair(2, COLOR_GREEN, COLOR_WHITE);   // Target color (Green on White)
     init_pair(3, COLOR_YELLOW, COLOR_WHITE);  // Obstacle color (Yellow on White)
-    init_pair(5, COLOR_BLACK, COLOR_WHITE);   // Black text on black background
 
     // Set background color to white
     if (has_colors()) {
@@ -101,24 +155,10 @@ void init_ncurses() {
 
 void draw_window() {
     clear();
-    border((char) 219, (char) 219, (char) 219, (char) 219, (char) 219, (char) 219, (char) 219, (char) 219);
-
-
-    // Get current window size
-    int max_y, max_x;
-    getmaxyx(stdscr, max_y, max_x);
-
-    // Update WIDTH and HEIGHT based on the current window size
-    WIDTH = max_x;
-    HEIGHT = max_y;
-        // Print debug information in black
-    attron(COLOR_PAIR(5));
-    mvprintw(HEIGHT-4, 0, "width =%d, height=%d", WIDTH, HEIGHT);
-    attroff(COLOR_PAIR(5));
+    border(0, 0, 0, 0, 0, 0, 0, 0);
 }
 
 void draw_drone(Drone *drone) {
-    
     attron(COLOR_PAIR(1));
     mvprintw(drone->y, drone->x, "%c", DRONE_CHAR);
     mvprintw(drone->y - 1, drone->x, " ");
@@ -127,35 +167,6 @@ void draw_drone(Drone *drone) {
     mvprintw(drone->y, drone->x + 1, " ");
     attroff(COLOR_PAIR(1));
 }
-
-
-
-
-void move_drone(Drone *drone) {
-
-    double Q1 = drone->force_x - M * (drone->x2 - 2 * drone->x1) / (T*T)  + K * drone->x1 / T ;
-
-    drone->x = Q1 ;// ((M / (T*T)) - (K / T))
-
-    double Q2 = drone->force_y - M * (drone->y2 - 2 * drone->y1)  / (T*T) + K  * drone->y1 / T;
-
-    drone->y = Q2 ;
-
-    drone->x2 = drone->x1;
-    drone->x1 = drone->x;
-
-    drone->y2 = drone->y1;
-    drone->y1 = drone->y;
-    
-
-
-    if (drone->x < 1) drone->x = 1;
-    if (drone->x >= WIDTH - 1) drone->x = WIDTH - 2;
-    if (drone->y < 1) drone->y = 1;
-    if (drone->y >= HEIGHT - 1) drone->y = HEIGHT - 2;
-
-}
-
 
 void handle_input(Drone *drone) {
     int ch = getch();
@@ -176,19 +187,19 @@ void handle_input(Drone *drone) {
         case KEY_RIGHT:
             drone->force_x += 1.0;
             break;
-        case 'Q':
+        case 'u':
             drone->force_x -= 1.0;
             drone->force_y -= 1.0;
             break;
-        case 'E':
+        case 'i':
             drone->force_x += 1.0;
             drone->force_y -= 1.0;
             break;
-        case 'Z':
+        case 'j':
             drone->force_x -= 1.0;
             drone->force_y += 1.0;
             break;
-        case 'C':
+        case 'k':
             drone->force_x += 1.0;
             drone->force_y += 1.0;
             break;
@@ -199,135 +210,26 @@ void handle_input(Drone *drone) {
     }
 }
 
+void move_drone(Drone *drone) {
+    // Add damping factor for smoother movement
+    double damping = 0.50;
 
-*/
+    drone->x += (int)drone->force_x;
+    drone->y += (int)drone->force_y;
 
-#include "./../headerFiles/dynamics.h"
+    if (drone->x < 1) drone->x = 1;
+    if (drone->x >= WIDTH - 1) drone->x = WIDTH - 2;
+    if (drone->y < 1) drone->y = 1;
+    if (drone->y >= HEIGHT - 1) drone->y = HEIGHT - 2;
 
-// typedef struct {
-//     int x;
-//     int y;
-//     int active;
-// } Target;
-
-// typedef struct {
-//     int x;
-//     int y;
-//     int active;
-// } Obstacle;
-
-void init_ncurses();
-void draw_window();
-void draw_drone(Drone *drone);
-// void draw_target(Target *target);
-// void draw_obstacle(Obstacle *obstacle);
-void move_drone(Drone *drone);
-// void generate_target(Target *target);
-// void generate_obstacle(Obstacle *obstacle);
-// void check_collision(Drone *drone, Target *target, Obstacle *obstacle);
-void handle_input(Drone *drone);
-
-int main() {
-    srand(time(NULL));
-
-    init_ncurses();
-
-    
-
-    Drone drone = {WIDTH / 2, HEIGHT / 2, 0, 0};
-    // Target target = {0, 0, 0};
-    // Obstacle obstacle = {0, 0, 0};
-
-    // generate_target(&target);
-    // generate_obstacle(&obstacle);
-
-    int shared_seg_size = 2 * sizeof(double);
-    
-    // Open shared memory
-    int shmfd = shm_open(SHMOBJ_PATH, O_RDWR, 0666);
-    position_array = (double*)mmap(NULL, shared_seg_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmfd, 0);
-
-    // Open semaphores
-    sem_t *sem_id1 = sem_open(SEM_PATH_1, 0);
-    sem_t *sem_id2 = sem_open(SEM_PATH_2, 0);
-
-    // Set up signal handling
-    struct sigaction sa;
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = handler_dyn;
-    sigaction(SIGUSR1, &sa, NULL);
-
-    while (1) {
-
-        draw_window();
-        draw_drone(&drone);
-        // draw_target(&target);
-        // draw_obstacle(&obstacle);
-
-        move_drone(&drone);
-
-        sem_wait(sem_id1); //wait reader
-        position_array[0] = drone.x;
-        position_array[1] = drone.y;
-        //sleep(1);
-        sem_post(sem_id2); //start the read
-
-        // check_collision(&drone, &target, &obstacle);
-        handle_input(&drone);
-        
-        refresh();
-        usleep(10000); // sleep for 10ms (smoother movement)
-    }
-
-    endwin();
-
-    /* Clean all and exit */
-    sem_close(sem_id1);
-    sem_close(sem_id2);
-    sem_unlink(SEM_PATH_1);
-    sem_unlink(SEM_PATH_2);
-
-    return 0;
+    // Apply damping
+    drone->force_x *= damping;
+    drone->force_y *= damping;
 }
 
-
-// void draw_target(Target *target) {
-//     if (target->active) {
-//         attron(COLOR_PAIR(2));
-//         mvprintw(target->y, target->x, "%c", TARGET_CHAR);
-//         attroff(COLOR_PAIR(2));
-//     }
-// }
-
-// void draw_obstacle(Obstacle *obstacle) {
-//     if (obstacle->active) {
-//         attron(COLOR_PAIR(3));
-//         mvprintw(obstacle->y, obstacle->x, "%c", OBSTACLE_CHAR);
-//         attroff(COLOR_PAIR(3));
-//     }
-// }
-
-// void generate_target(Target *target) {
-//     target->x = rand() % (WIDTH - 2) + 1;
-//     target->y = rand() % (HEIGHT - 2) + 1;
-//     target->active = 1;
-// }
-
-// void generate_obstacle(Obstacle *obstacle) {
-//     obstacle->x = rand() % (WIDTH - 2) + 1;
-//     obstacle->y = rand() % (HEIGHT - 2) + 1;
-//     obstacle->active = 1;
-// }
-
-// void check_collision(Drone *drone, Target *target, Obstacle *obstacle) {
-//     if (drone->x == target->x && drone->y == target->y) {
-//         target->active = 0;
-//         generate_target(target);
-//     }
-
-//     if (drone->x == obstacle->x && drone->y == obstacle->y) {
-//         obstacle->active = 0;
-//         generate_obstacle(obstacle);
-//     }
-// }
-
+void write_data_to_shm(Drone *drone, sem_t *sem_id1, sem_t *sem_id2) {
+    sem_wait(sem_id1); // wait for the reader
+    position_array[0] = drone->x;
+    position_array[1] = drone->y;
+    sem_post(sem_id2); // start the read
+}

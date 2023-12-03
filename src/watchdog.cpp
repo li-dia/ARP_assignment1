@@ -14,7 +14,7 @@
 #define SHM_pids "/my_shared_memory_pids"
 #define SEM_PATH_1 "/sem_PID_1"
 #define SEM_PATH_2 "/sem_PID_2"
-#define MAX_PIDS 3
+#define MAX_PIDS 2
 
 pid_t *pid_array;
 
@@ -55,15 +55,7 @@ int main() {
     if (close(shm_fd_pids) == -1) {
         perror("close failed");
         return -1;
-    }
-
- /*
- // Set up signal handling
-    struct sigaction sa;
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = handler_wd;
-    sigaction(SIGUSR1, &sa, NULL);
- */   
+    } 
 
     const char *filename = "WD_log.txt";  
     bool brk = false;
@@ -89,11 +81,12 @@ int main() {
         } else {
             perror("Error sending signal");
             printf("Process with PID %d is not responding.\n", target_pid);
+            brk = true;
 
             // Perform cleanup actions, as in your original code
             for (int j = 0; j < MAX_PIDS; j++) {
                 if (kill(pid_array[j], SIGKILL) == 0) {
-                    printf("Sending a SIGKILL to all processes.\n", pid_array[j]);
+                    printf("Sending a SIGKILL to all processes.\n");
                 }
             }
 
@@ -102,11 +95,14 @@ int main() {
                 fprintf(file, "Process with PID %d is not responding.\n", target_pid);
                 fprintf(file, "ALL PROCESSES ARE TERMINATED.\n");
                 fclose(file);
+                break;
             } else {
                 perror("Error opening file for writing");
             }
         }
     }
+    if(brk)
+        break;
 }
 
     // Unmap the shared memory for PIDs

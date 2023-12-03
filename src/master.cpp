@@ -12,13 +12,13 @@
 #define SEM_PATH_1 "/sem_PID_1"
 #define SEM_PATH_2 "/sem_PID_2"
 #define SHM_SIZE 1024  // Adjust the size as needed
-#define MAX_PIDS 3
+#define MAX_PIDS 2
 
 // if a process is here give it the key 
 int spawn(char *program_path) {
     pid_t child_pid = fork();
     if (child_pid == 0) {
-        printf("child's pid %d\n", getpid());
+        //printf("child's pid %d\n", getpid());
         if (execlp(program_path, program_path, NULL) == -1) { //  ./bin/dynamics
             perror("execlp failed");
             exit(EXIT_FAILURE);
@@ -64,17 +64,17 @@ int main() {
 
     sem_wait(sem_id1); //wait reader
     // Specify the path to the programs you want to run.
-    char *program_path[MAX_PIDS] = {"./bin/dynamics", "./bin/server", "./...."};
+    char *program_path[MAX_PIDS] = {"./bin/dynamics", "./bin/server"};
 
     for (int i = 0; i < MAX_PIDS; i++) {
         pid_array[i] = spawn(program_path[i]);
         usleep(10);
-        printf("child %d created with pid: %d\n", i, pid_array[i]);
+        //printf("child %d created with pid: %d\n", i, pid_array[i]);
         fflush(stdout);
     }
     sem_post(sem_id2); //start the read
     // Print the PIDs stored in shared memory
-    printf("PIDs stored in shared memory: %d, %d, %d\n", (int)pid_array[0], (int)pid_array[1], (int)pid_array[2]);
+    //printf("PIDs stored in shared memory: %d, %d, %d\n", (int)pid_array[0], (int)pid_array[1], (int)pid_array[2]);
     
     // Wait for all child processes to finish
     for (int i = 0; i < MAX_PIDS; i++) {
@@ -94,7 +94,7 @@ int main() {
     }
 
     if (shm_unlink(SHM_NAME) == -1) {
-        perror("shm_unlink failed");
+        perror("master: shm_unlink failed");
         exit(EXIT_FAILURE);
     }
 
