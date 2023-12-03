@@ -11,9 +11,9 @@ g++ src/watchdog.cpp -lncurses -lm -lrt -lpthread -o bin/watchdog
 echo "Compiling watchdog";  
 
  
-gnome-terminal --command="./bin/master" 
+gnome-terminal -- "./bin/master" 
 
 sleep 1
-gnome-terminal --command="./bin/watchdog"
+gnome-terminal -- "./bin/watchdog"
 
 
