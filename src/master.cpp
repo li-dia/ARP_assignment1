@@ -8,17 +8,21 @@
 #include <sys/wait.h>
 #include <semaphore.h>
 
-#define SHM_NAME "/my_shared_memory_pids"
-#define SEM_PATH_1 "/sem_PID_1"
-#define SEM_PATH_2 "/sem_PID_2"
-#define SHM_SIZE 1024  // Adjust the size as needed
-#define MAX_PIDS 2
 
-// if a process is here give it the key 
+#define SHM_NAME "/my_shared_memory_pids" // shared memory path
+#define SEM_PATH_1 "/sem_PID_1"  //semaphore 1 path
+#define SEM_PATH_2 "/sem_PID_2"  //semaphore 2 path
+
+/*  Constants  */
+
+#define SHM_SIZE 1024   // shared memory size
+#define MAX_PIDS 2      // maximum number of child processes
+
+
+// Function to execute the child processes 
 int spawn(char *program_path) {
     pid_t child_pid = fork();
     if (child_pid == 0) {
-        //printf("child's pid %d\n", getpid());
         if (execlp(program_path, program_path, NULL) == -1) { //  ./bin/dynamics
             perror("execlp failed");
             exit(EXIT_FAILURE);
@@ -32,8 +36,10 @@ int spawn(char *program_path) {
 
 
 int main() {
+    int status;
     // Create or open a shared memory object
     int shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
+
     if (shm_fd == -1) {
         perror("shm_open failed");
         exit(EXIT_FAILURE);
@@ -52,7 +58,6 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    int status;
 
     // Create or open semaphores
     sem_t *sem_id1 = sem_open(SEM_PATH_1, O_CREAT, S_IRUSR | S_IWUSR, 0);
@@ -63,19 +68,17 @@ int main() {
     sem_init(sem_id2, 1, 0); // initialized to 0
 
     sem_wait(sem_id1); //wait reader
-    // Specify the path to the programs you want to run.
+
     char *program_path[MAX_PIDS] = {"./bin/dynamics", "./bin/server"};
 
     for (int i = 0; i < MAX_PIDS; i++) {
         pid_array[i] = spawn(program_path[i]);
         usleep(10);
-        //printf("child %d created with pid: %d\n", i, pid_array[i]);
         fflush(stdout);
     }
+
     sem_post(sem_id2); //start the read
-    // Print the PIDs stored in shared memory
-    //printf("PIDs stored in shared memory: %d, %d, %d\n", (int)pid_array[0], (int)pid_array[1], (int)pid_array[2]);
-    
+
     // Wait for all child processes to finish
     for (int i = 0; i < MAX_PIDS; i++) {
         wait(&status);
@@ -88,16 +91,19 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
+    //close the shared memory 
     if (close(shm_fd) == -1) {
         perror("close failed");
         exit(EXIT_FAILURE);
     }
 
+    // unlink the shared memory
     if (shm_unlink(SHM_NAME) == -1) {
         perror("master: shm_unlink failed");
         exit(EXIT_FAILURE);
     }
 
+    // closing semaphores
     sem_close(sem_id1);
     sem_close(sem_id2);
     return EXIT_SUCCESS;

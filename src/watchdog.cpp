@@ -33,7 +33,7 @@ int main() {
     
     /* Wait for Master to write */
     sem_wait(sem_id2);
-    printf("data read \n");
+    printf("Watchdog !\n");
 
     // Map the shared memory segment into the address space for PIDs
     pid_array = (pid_t*)mmap(NULL, MAX_PIDS * sizeof(pid_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd_pids, 0);
