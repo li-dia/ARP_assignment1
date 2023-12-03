@@ -18,26 +18,40 @@
 #define SEM_PATH_2 "/sem_POS_2"
 
 /* Constants */
-#define WIDTH 80
-#define HEIGHT 24
-#define DRONE_CHAR '+'
+#define FORCE 1.0
+#define M 1.0
+#define K 1.0
+#define T 0.1
+#define DRONE_CHAR 'X'
+#define WIDTH 100
+#define HEIGHT 50
 
 /* Structures */
 typedef struct {
-    int x;
-    int y;
-    double force_x;
-    double force_y;
+    double x;  // current position on x axis 
+    double y;  // current position on y axis 
+    double x1; // position on x axis at (i-1)
+    double y1; // position on y axis at (i-1)
+    double x2; // position on x axis at (i-2)
+    double y2; // position on y axis at (i-2)
+    double fx; // movement force on x axis 
+    double fy; // movement force on y axis 
+
 } Drone;
 
 /* Functions */
 void handler_dyn(int sig, siginfo_t *info, void *context);
 void init_ncurses();
+void init_drone(Drone *drone);
 void draw_window();
-void draw_drone(Drone *drone);
-void move_drone(Drone *drone);
-void handle_input(Drone *drone);
+void draw_drone(int x, int y);
+void euler_method(int key, Drone *drone);
 void write_data_to_shm(Drone *drone, sem_t *sem_id1, sem_t *sem_id2);
+
+// void draw_window();
+// void draw_drone(Drone *drone);
+// void move_drone(Drone *drone);
+// void handle_input(Drone *drone);
 
 double *position_array;
 
@@ -45,8 +59,9 @@ int main() {
     srand(time(NULL));
 
     init_ncurses();
-
-    Drone drone = {WIDTH / 2, HEIGHT / 2, 0, 0};
+    Drone drone ;
+    init_drone(&drone);
+    int ch;
 
     int shared_seg_size = 2 * sizeof(double);
 
@@ -84,11 +99,13 @@ int main() {
     }
 
     while (1) {
+
         draw_window();
-        draw_drone(&drone);
-        move_drone(&drone);
+        draw_drone((int)drone.x, (int)drone.y);
+        ch = getch();
+        euler_method(ch, &drone);
+
         write_data_to_shm(&drone, sem_id1, sem_id2);
-        handle_input(&drone);
         refresh();
         usleep(10000); // sleep for 10ms (smoother movement)
     }
@@ -132,20 +149,9 @@ void handler_dyn(int sig, siginfo_t *info, void *context) {
     }
 }
 
+
 void init_ncurses() {
     initscr();
-    start_color();
-    init_pair(1, COLOR_BLUE, COLOR_WHITE);    // Drone color (Blue on White)
-    init_pair(2, COLOR_GREEN, COLOR_WHITE);   // Target color (Green on White)
-    init_pair(3, COLOR_YELLOW, COLOR_WHITE);  // Obstacle color (Yellow on White)
-
-    // Set background color to white
-    if (has_colors()) {
-        start_color();
-        init_pair(4, COLOR_WHITE, COLOR_WHITE);
-        bkgd(COLOR_PAIR(4));
-    }
-
     raw();
     keypad(stdscr, TRUE);
     noecho();
@@ -153,79 +159,116 @@ void init_ncurses() {
     timeout(0);
 }
 
-void draw_window() {
-    clear();
-    border(0, 0, 0, 0, 0, 0, 0, 0);
+void init_drone(Drone *drone) {
+    drone->x = WIDTH / 2.0;
+    drone->y = HEIGHT / 2.0;
+    drone->x1 = 0.0;
+    drone->y1 = 0.0;
+    drone->x2 = 0.0;
+    drone->y2 = 0.0;
+    drone->fx = 0.0;
+    drone->fy = 0.0;
 }
 
-void draw_drone(Drone *drone) {
+void draw_window() {
+    clear();
+    border('|', '|', '-', '-', ' ', ' ', ' ', ' '); 
+}
+
+void draw_drone(int x, int y) {
     attron(COLOR_PAIR(1));
-    mvprintw(drone->y, drone->x, "%c", DRONE_CHAR);
-    mvprintw(drone->y - 1, drone->x, " ");
-    mvprintw(drone->y + 1, drone->x, " ");
-    mvprintw(drone->y, drone->x - 1, " ");
-    mvprintw(drone->y, drone->x + 1, " ");
+    mvprintw(y, x, "%c", DRONE_CHAR);
+    mvprintw(y - 1, x, " ");
+    mvprintw(y + 1, x, " ");
+    mvprintw(y, x - 1, " ");
+    mvprintw(y, x + 1, " ");
     attroff(COLOR_PAIR(1));
 }
 
-void handle_input(Drone *drone) {
-    int ch = getch();
+void euler_method(int key, Drone *drone) {
 
-    switch (ch) {
+    switch (key) {
         case 'q':
             endwin();
             exit(0);
         case KEY_UP:
-            drone->force_y -= 1.0;
-            break;
-        case KEY_DOWN:
-            drone->force_y += 1.0;
+            printw("I changed the force TO GO UP \n");
+            drone->fy -= FORCE;
+            // drone->vy -= FORCE;
             break;
         case KEY_LEFT:
-            drone->force_x -= 1.0;
+            printw("I changed the force TO GO DOWN \n");
+            drone->fx -= FORCE;
+            // drone->vx -= FORCE;
+            break;
+        case KEY_DOWN:
+            // drone->vy += FORCE;
+            drone->fy += FORCE;
             break;
         case KEY_RIGHT:
-            drone->force_x += 1.0;
+            drone->fx += FORCE;
+            // drone->vx += FORCE;
             break;
         case 'u':
-            drone->force_x -= 1.0;
-            drone->force_y -= 1.0;
+
+            if (drone->fx >= drone->fy) drone->fy = drone->fx;
+            else if(drone->fy > drone->fx) drone->fx = drone->fy;
+            drone->fx -= FORCE ;
+            drone->fy -= FORCE ;
+
             break;
         case 'i':
-            drone->force_x += 1.0;
-            drone->force_y -= 1.0;
+            if (drone->fx >= drone->fy) drone->fy = drone->fx;
+            else if(drone->fy > drone->fx) drone->fx = drone->fy;
+            drone->fx += FORCE ;
+            drone->fy -= FORCE ;
             break;
         case 'j':
-            drone->force_x -= 1.0;
-            drone->force_y += 1.0;
+            if (drone->fx >= drone->fy) drone->fy = drone->fx;
+            else if(drone->fy > drone->fx) drone->fx = drone->fy;
+            drone->fx -= FORCE ;
+            drone->fy += FORCE ;
             break;
         case 'k':
-            drone->force_x += 1.0;
-            drone->force_y += 1.0;
+            
+            if (drone->fx >= drone->fy) drone->fy = drone->fx;
+            else if(drone->fy > drone->fx) drone->fx = drone->fy;
+            drone->fx += FORCE ;
+            drone->fy += FORCE ;
             break;
         case 'r':
-            drone->x = WIDTH / 2;
-            drone->y = HEIGHT / 2;
+            drone->fx = 0 ;
+            drone->fy = 0 ;
+            break;
+
+        case 'a':
+            init_drone(drone);
             break;
     }
-}
 
-void move_drone(Drone *drone) {
-    // Add damping factor for smoother movement
-    double damping = 0.50;
+    // Euler's method for position calculation
+    // printw("I changed the position \n");
+    drone->x = ((2 * M + K * T) * drone->x1 - M * drone->x2 + T * T * drone->fx) / (K * T + M);
+    drone->y = ((2 * M + K * T) * drone->y1 - M * drone->y2 + T * T * drone->fy) / (K * T + M);
 
-    drone->x += (int)drone->force_x;
-    drone->y += (int)drone->force_y;
+    // Updating the previous positions accordingly
+    
+    drone->x2 = drone->x1;
+    drone->y2 = drone->y1;
+    drone->x1 = drone->x;
+    drone->y1 = drone->y;
 
+
+    // drone->x += drone->vx * T;
+    // drone->y += drone->vy * T;
+
+    // Ensure the drone stays within the window bounds
     if (drone->x < 1) drone->x = 1;
     if (drone->x >= WIDTH - 1) drone->x = WIDTH - 2;
     if (drone->y < 1) drone->y = 1;
     if (drone->y >= HEIGHT - 1) drone->y = HEIGHT - 2;
-
-    // Apply damping
-    drone->force_x *= damping;
-    drone->force_y *= damping;
 }
+
 
 void write_data_to_shm(Drone *drone, sem_t *sem_id1, sem_t *sem_id2) {
     sem_wait(sem_id1); // wait for the reader
